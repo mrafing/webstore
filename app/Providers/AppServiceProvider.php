@@ -2,11 +2,18 @@
 
 namespace App\Providers;
 
+use App\Actions\ValidateCartStock;
 use Illuminate\Support\Number;
 use App\Services\SessionCartService;
 use App\Contract\CartServiceInterface;
+use App\Models\User;
+use App\Services\PaymentMethodQueryService;
+use App\Services\RegionQueryService;
+use App\Services\ShippingMethodService;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\ServiceProvider;
+use Illuminate\Validation\ValidationException;
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -16,6 +23,9 @@ class AppServiceProvider extends ServiceProvider
     public function register(): void
     {
         $this->app->bind(CartServiceInterface::class, SessionCartService::class);
+        $this->app->bind(RegionQueryService::class, RegionQueryService::class);
+        $this->app->bind(ShippingMethodService::class, ShippingMethodService::class);
+        $this->app->bind(PaymentMethodQueryService::class, PaymentMethodQueryService::class);
     }
 
     /**
@@ -25,5 +35,15 @@ class AppServiceProvider extends ServiceProvider
     {
         Model::unguard();
         Number::useCurrency('IDR');
+
+        Gate::define('is_stock_available', function(User $user = null) {
+            try {
+                ValidateCartStock::run();
+                return true;
+            } catch (ValidationException $e) {
+                session()->flash('error', $e->getMessage());
+                return false;
+            }
+        });
     }
 }
